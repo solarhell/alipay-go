@@ -1,0 +1,6 @@
+# 二进制与覆盖率产物
+*.test
+*.out
+
+# go build 落在仓库根的二进制
+/postgen

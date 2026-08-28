@@ -1,0 +1,11 @@
+# 本 SDK 生成的接口白名单，每行一个 operationId。
+#
+# 刻意不生成全部 739 个接口：支付宝的 spec 覆盖了从交易到营销的所有业务域，
+# 全量生成会产出数十万行、绝大多数使用者永远用不到的代码。这里只收录
+# 当面付/扫码支付这条主链路，需要别的接口时在本文件加一行、重跑 make generate 即可。
+alipay.trade.precreate
+alipay.trade.query
+alipay.trade.refund
+alipay.trade.close
+alipay.trade.fastpay.refund.query
+alipay.data.dataservice.bill.downloadurl.query
