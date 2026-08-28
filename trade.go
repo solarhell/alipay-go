@@ -97,6 +97,9 @@ func (c *Client) Precreate(ctx context.Context, req *PrecreateRequest) (*Precrea
 //
 // 它同时是异步通知的兜底手段：通知可能延迟、重复甚至丢失，最终发货与否应当以
 // 这里查到的 trade_status 为准，用 Paid 判断。
+//
+// 注意 Precreate 之后立刻查会返回 ACQ.TRADE_NOT_EXIST：预下单只是生成二维码，
+// 在有人扫码支付之前交易并不存在。这是正常的，不是错误。
 func (c *Client) Query(ctx context.Context, req *QueryRequest) (*QueryResponse, error) {
 	var out QueryResponse
 	if err := c.do(ctx, http.MethodPost, "/v3/alipay/trade/query", nil, req, &out); err != nil {

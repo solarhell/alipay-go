@@ -111,7 +111,13 @@ make generate   # 从官方规范重新生成（联网）
 
 ## 状态
 
-签名实现依据支付宝官方仓库中的 [Postman 签名脚本](https://github.com/alipay/alipay-sdk-php-all/blob/master/v3/script/postman_script.js)，待签串的确切字节有测试钉死，客户端测试会站在支付宝的位置验证发出的请求签名。**但尚未与支付宝沙箱做过端到端联调**，接入生产前请先在沙箱验证。
+签名实现依据支付宝官方仓库中的 [Postman 签名脚本](https://github.com/alipay/alipay-sdk-php-all/blob/master/v3/script/postman_script.js)，待签串的确切字节有测试钉死，并已在**支付宝沙箱完成端到端联调**：
+
+- `alipay.trade.precreate` 返回真实二维码码串——请求签名被支付宝接受，响应验签通过
+- `alipay.data.dataservice.bill.downloadurl.query` 调用成功——覆盖 GET 这条独立的签名路径（报文体为空，待签串形状不同）
+- 错误响应正确解析成 `*Error`，错误码、中文描述、trace id 都对得上
+
+异步通知的验签逻辑有单元测试覆盖（篡改金额、篡改状态、追加参数、换用公钥都会被拒），但它要真实支付才会触发，**还没用一条真实通知验证过**。接入生产前建议在沙箱走一遍完整支付。
 
 ## License
 
