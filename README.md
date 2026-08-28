@@ -1,0 +1,118 @@
+# alipay-go
+
+支付宝 Go SDK，接口类型由**支付宝官方 OpenAPI v3 规范生成**，只依赖标准库。
+
+[![CI](https://github.com/solarhell/alipay-go/actions/workflows/ci.yml/badge.svg)](https://github.com/solarhell/alipay-go/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/solarhell/alipay-go.svg)](https://pkg.go.dev/github.com/solarhell/alipay-go)
+
+## 这个库和别的支付宝 Go SDK 有什么不同
+
+- **类型来自官方规范，不是手抄。** 请求、响应、错误码全部由 [alipay-sdk-java-all](https://github.com/alipay/alipay-sdk-java-all) 里那份 openapi.yaml 生成——支付宝官方就是用它生成自家 Java / PHP / .NET 的 v3 SDK，唯独没有生成 Go。字段的中文说明和示例值也一并带了过来。
+- **零第三方依赖。** 只用标准库，`go.mod` 里没有 require 任何东西。支付 SDK 的依赖面就是攻击面。
+- **走 v3 接口。** 签名方式与 v1 完全不同，报文是标准 JSON，错误用 HTTP 状态码表达。
+- **把"结果未知"当成一等公民。** 见下文。
+
+## 要求
+
+Go 1.27 或更高。用到了 `new(表达式)`（Go 1.26）和 `encoding/json/v2`。
+
+## 安装
+
+```bash
+go get github.com/solarhell/alipay-go
+```
+
+## 快速开始
+
+```go
+client, err := alipay.New(
+    appID,
+    appPrivateKey,   // 应用私钥：PKCS#1 / PKCS#8 / 裸 base64 都认
+    alipayPublicKey, // 支付宝公钥，不是你自己上传的应用公钥
+)
+if err != nil {
+    return err
+}
+
+// 扫码支付预下单。字段是指针，Go 1.26 起可以直接 new(表达式)。
+resp, err := client.Precreate(ctx, &alipay.PrecreateRequest{
+    OutTradeNo:  new("T20260828001"),
+    TotalAmount: new("0.01"),
+    Subject:     new("测试商品"),
+})
+if err != nil {
+    return err
+}
+fmt.Println(*resp.QrCode) // 拿这个码串生成二维码
+```
+
+更多用法见 [pkg.go.dev 上的示例](https://pkg.go.dev/github.com/solarhell/alipay-go#pkg-examples)。
+
+## 错误处理
+
+支付宝这里有一档 Stripe 那种设计里没有的语义：**结果未知**。下单请求超时，或者收到 `ACQ.SYSTEM_ERROR`，订单都可能已经在支付宝侧建好了——当失败重发就是重复扣款。
+
+| 判断 | 含义 | 该怎么做 |
+|---|---|---|
+| `alipay.Indeterminate(err)` | 请求可能已生效 | **先用同一个订单号查询确认**，绝不能直接重发 |
+| `alipay.Retryable(err)` | 明确被拒且无副作用（限流等） | 退避后原样重试 |
+| `errors.Is(err, alipay.ErrSignature)` | 验签失败 | 报文不可信，不要采信其中的金额和状态 |
+| 以上都不是 | 终态失败 | 按业务处理 |
+
+```go
+if alipay.Indeterminate(err) {
+    // 查询真实状态，而不是重下一单
+}
+if alipay.IsCode(err, alipay.CodeACQTradeNotExist) {
+    // 错误码是 Code 类型的常量，值就是支付宝原码
+}
+```
+
+75 个错误码常量由规范生成，与官方原码一一对应。注意 `ACQ.TRADE_NOT_EXIST`（交易域）和 `TRADE_NOT_EXIST`（账单域）是两个不同的码，分别对应 `CodeACQTradeNotExist` 和 `CodeTradeNotExist`。
+
+## 异步通知
+
+```go
+n, err := client.ParseNotification(r) // 验签 + 核对 app_id
+if err != nil {
+    http.Error(w, "invalid", http.StatusBadRequest)
+    return
+}
+if n.Paid() { // 只有 TRADE_SUCCESS / TRADE_FINISHED 算收到钱
+    // 金额必须你自己核对：SDK 不知道这笔订单该是多少钱
+    // 通知会重复送达，发货逻辑必须幂等
+}
+fmt.Fprint(w, alipay.NotifySuccess) // 处理成功后必须原样回 "success"
+```
+
+异步通知至今没有 v3 版本，仍走 v1 的参数排序验签，这些差异 SDK 内部消化了。
+
+## 已生成的接口
+
+| 方法 | 接口 |
+|---|---|
+| `Precreate` | alipay.trade.precreate |
+| `Query` | alipay.trade.query |
+| `Refund` | alipay.trade.refund |
+| `RefundQuery` | alipay.trade.fastpay.refund.query |
+| `Close` | alipay.trade.close |
+| `BillDownloadURL` | alipay.data.dataservice.bill.downloadurl.query |
+
+规范里有 739 个接口，这里只生成了扫码支付这条主链路。全量生成会产出几十万行绝大多数人用不到的代码。**需要别的接口，在 `scripts/operations.txt` 里加一行，重跑 `make generate` 即可**——类型、错误码都会自动补齐。
+
+## 开发
+
+```bash
+make            # test + vet + gofmt + go fix 检查
+make generate   # 从官方规范重新生成（联网）
+```
+
+生成产物已提交进仓库，使用这个库不需要任何工具链。`OPENAPI_VERSION` 钉住规范的 commit，升级规范是一次显式提交。
+
+## 状态
+
+签名实现依据支付宝官方仓库中的 [Postman 签名脚本](https://github.com/alipay/alipay-sdk-php-all/blob/master/v3/script/postman_script.js)，待签串的确切字节有测试钉死，客户端测试会站在支付宝的位置验证发出的请求签名。**但尚未与支付宝沙箱做过端到端联调**，接入生产前请先在沙箱验证。
+
+## License
+
+MIT
