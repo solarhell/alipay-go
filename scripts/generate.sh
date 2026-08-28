@@ -30,11 +30,12 @@ echo "    $(wc -l < "$SPEC_FILE" | tr -d ' ') 行"
 # 本 SDK 得以只依赖标准库。
 echo "==> 生成 internal/openapi/openapi.gen.go"
 echo "    接口: $(echo "$OPERATIONS" | tr ',' '\n' | wc -l | tr -d ' ') 个"
-go tool oapi-codegen \
+# 生成器在 tools/ 那个独立 module 里，见 tools/go.mod 的说明
+go -C tools tool oapi-codegen \
   -generate types \
   -package openapi \
   -include-operation-ids "$OPERATIONS" \
-  -o internal/openapi/openapi.gen.go \
+  -o "$PWD/internal/openapi/openapi.gen.go" \
   "$SPEC_FILE"
 
 echo "    $(wc -l < internal/openapi/openapi.gen.go | tr -d ' ') 行"
