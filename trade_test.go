@@ -7,7 +7,8 @@ import (
 	"testing"
 )
 
-func ptr[T any](v T) *T { return &v }
+//go:fix inline
+func ptr[T any](v T) *T { return new(v) }
 
 // TestEndpoints 钉住每个方法实际打到的 HTTP 方法与路径。
 //
@@ -25,7 +26,7 @@ func TestEndpoints(t *testing.T) {
 			name: "Precreate",
 			call: func(ctx context.Context, c *Client) error {
 				_, err := c.Precreate(ctx, &PrecreateRequest{
-					OutTradeNo: ptr("T1"), TotalAmount: ptr("0.01"), Subject: ptr("测试"),
+					OutTradeNo: new("T1"), TotalAmount: new("0.01"), Subject: new("测试"),
 				})
 				return err
 			},
@@ -35,7 +36,7 @@ func TestEndpoints(t *testing.T) {
 		{
 			name: "Query",
 			call: func(ctx context.Context, c *Client) error {
-				_, err := c.Query(ctx, &QueryRequest{OutTradeNo: ptr("T1")})
+				_, err := c.Query(ctx, &QueryRequest{OutTradeNo: new("T1")})
 				return err
 			},
 			wantMethod: http.MethodPost,
@@ -45,7 +46,7 @@ func TestEndpoints(t *testing.T) {
 			name: "Refund",
 			call: func(ctx context.Context, c *Client) error {
 				_, err := c.Refund(ctx, &RefundRequest{
-					OutTradeNo: ptr("T1"), RefundAmount: ptr("0.01"), OutRequestNo: ptr("R1"),
+					OutTradeNo: new("T1"), RefundAmount: new("0.01"), OutRequestNo: new("R1"),
 				})
 				return err
 			},
@@ -55,7 +56,7 @@ func TestEndpoints(t *testing.T) {
 		{
 			name: "RefundQuery",
 			call: func(ctx context.Context, c *Client) error {
-				_, err := c.RefundQuery(ctx, &RefundQueryRequest{OutTradeNo: ptr("T1"), OutRequestNo: ptr("R1")})
+				_, err := c.RefundQuery(ctx, &RefundQueryRequest{OutTradeNo: new("T1"), OutRequestNo: new("R1")})
 				return err
 			},
 			wantMethod: http.MethodPost,
@@ -64,7 +65,7 @@ func TestEndpoints(t *testing.T) {
 		{
 			name: "Close",
 			call: func(ctx context.Context, c *Client) error {
-				_, err := c.Close(ctx, &CloseRequest{OutTradeNo: ptr("T1")})
+				_, err := c.Close(ctx, &CloseRequest{OutTradeNo: new("T1")})
 				return err
 			},
 			wantMethod: http.MethodPost,
@@ -75,7 +76,7 @@ func TestEndpoints(t *testing.T) {
 			name: "BillDownloadURL",
 			call: func(ctx context.Context, c *Client) error {
 				_, err := c.BillDownloadURL(ctx, &BillDownloadURLRequest{
-					BillType: ptr("trade"), BillDate: ptr("2026-08-01"),
+					BillType: new("trade"), BillDate: new("2026-08-01"),
 				})
 				return err
 			},
@@ -120,7 +121,7 @@ func TestBillDownloadURLOmitsEmptyParams(t *testing.T) {
 		io.WriteString(w, `{}`)
 	})
 
-	if _, err := c.BillDownloadURL(context.Background(), &BillDownloadURLRequest{BillType: ptr("trade")}); err != nil {
+	if _, err := c.BillDownloadURL(context.Background(), &BillDownloadURLRequest{BillType: new("trade")}); err != nil {
 		t.Fatalf("调用失败: %v", err)
 	}
 	if gotQuery != "bill_type=trade" {

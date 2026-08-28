@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rsa"
-	"encoding/json"
+	json "encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +13,11 @@ import (
 	"strings"
 	"time"
 )
+
+// 用 encoding/json/v2 而不是 v1：v2 默认拒绝重复的 JSON 键、字段名大小写敏感。
+// 验签验的是原始字节、解析的是同一份报文，键重复时两者对"这份报文说了什么"
+// 的理解就可能分岔——签名过了，读到的却是另一个值。v1 的宽松匹配在别处无伤
+// 大雅，在金额和交易状态上不行。
 
 const (
 	// ProductionURL 是生产环境网关。

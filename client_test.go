@@ -274,8 +274,7 @@ func TestTransportFailureIsIndeterminate(t *testing.T) {
 	srv.Close()
 
 	err = c.do(context.Background(), http.MethodPost, "/v3/alipay/trade/precreate", nil, map[string]string{"a": "b"}, nil)
-	var te *TransportError
-	if !errors.As(err, &te) {
+	if _, ok := errors.AsType[*TransportError](err); !ok {
 		t.Fatalf("期望 *TransportError，得到 %T: %v", err, err)
 	}
 	if !Indeterminate(err) {

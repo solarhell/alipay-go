@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -38,9 +39,7 @@ func signNotify(t *testing.T, k *rsa.PrivateKey, values url.Values) url.Values {
 	}
 
 	out := url.Values{}
-	for key, v := range values {
-		out[key] = v
-	}
+	maps.Copy(out, values)
 	out.Set("sign", base64.StdEncoding.EncodeToString(raw))
 	out.Set("sign_type", "RSA2")
 	return out

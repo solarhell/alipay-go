@@ -132,11 +132,11 @@ func TestAuthorizationRoundTrip(t *testing.T) {
 		t.Fatalf("Authorization 未以 %q 开头: %q", prefix, got)
 	}
 	rest := strings.TrimPrefix(got, prefix)
-	i := strings.Index(rest, ",sign=")
-	if i < 0 {
+	before, after, ok := strings.Cut(rest, ",sign=")
+	if !ok {
 		t.Fatalf("Authorization 缺少 sign 段: %q", got)
 	}
-	authString, sign := rest[:i], rest[i+len(",sign="):]
+	authString, sign := before, after
 
 	// 拿头里的 authString 重建待签串，用公钥验证——这就是服务端做的事。
 	content := buildSignContent(authString, "POST", "/v3/alipay/trade/query", body, "")
@@ -215,7 +215,7 @@ func TestVerifySignature(t *testing.T) {
 func TestNewNonce(t *testing.T) {
 	shape := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 	seen := make(map[string]bool, 256)
-	for i := 0; i < 256; i++ {
+	for range 256 {
 		n, err := newNonce()
 		if err != nil {
 			t.Fatalf("newNonce: %v", err)

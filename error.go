@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 )
 
 // ErrSignature 表示验签失败：响应或异步通知的签名与内容对不上。
@@ -129,10 +130,5 @@ func IsCode(err error, codes ...Code) bool {
 	if !errors.As(err, &e) {
 		return false
 	}
-	for _, c := range codes {
-		if e.Code == c {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(codes, e.Code)
 }
