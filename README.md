@@ -70,6 +70,27 @@ if alipay.IsCode(err, alipay.CodeACQTradeNotExist) {
 
 75 个错误码常量由规范生成，与官方原码一一对应。注意 `ACQ.TRADE_NOT_EXIST`（交易域）和 `TRADE_NOT_EXIST`（账单域）是两个不同的码，分别对应 `CodeACQTradeNotExist` 和 `CodeTradeNotExist`。
 
+### ⚠️ 规范里的错误码枚举并非全部与线上一致
+
+支付宝这份 OpenAPI 规范是官方维护的，但**账单域的错误码枚举与网关实际返回对不上**。2026-09-04 用生产商户账号实测：
+
+| 场景 | 规范枚举 | 线上实际返回 |
+|---|---|---|
+| 账单不存在 | `BILL_NOT_EXIST` | **`isp.bill_not_exist`** |
+| 入参不合法 | `INVAILID_ARGUMENTS` | **`invalid_arguments`** |
+
+照规范里的常量判断会**漏判**。SDK 在 [`code_observed.go`](code_observed.go) 里提供了实测确认的取值，直接用它们：
+
+```go
+if alipay.IsCode(err, alipay.CodeBillNotExistObserved) {
+    // 账单尚未生成，或该日无交易
+}
+```
+
+生成的常量旁也标注了实测结论，IDE 里悬停即可看到。交易域（`ACQ.*`）目前未发现不一致，`BILL_DATE_BEFORE_REGISTRATION` 也与规范一致。
+
+做资金相关判断前，建议对着真实环境验证一次错误码，不要只依赖规范。
+
 ## 异步通知
 
 ```go

@@ -106,6 +106,18 @@ func extractCodes(f *ast.File) []string {
 	return codes
 }
 
+// knownMismatches 记录规范枚举值与线上实际返回不一致的错误码。
+//
+// 支付宝这份 OpenAPI 规范是官方维护的，但账单域的错误码枚举与网关实际返回对
+// 不上——照着常量判断会漏判。这里把实测结论直接写进生成的代码，让拿到常量的
+// 人当场看见，而不是等线上出了问题再去翻文档。
+//
+// 发现新的不一致就往这里加一行，重跑 make generate 即可。
+var knownMismatches = map[string]string{
+	"BILL_NOT_EXIST":     `线上实际返回 "isp.bill_not_exist"，本常量匹配不到（2026-09-04 生产商户账号实测）`,
+	"INVAILID_ARGUMENTS": `线上实际返回 "invalid_arguments"，本常量匹配不到（2026-09-04 生产商户账号实测）`,
+}
+
 // initialisms 保持全大写的词。ACQ 是支付宝收单域的官方前缀，留着方便和
 // 官方文档对照；其余是 Go 惯例中的首字母缩略词。
 var initialisms = map[string]string{
@@ -143,6 +155,10 @@ package %s
 //
 // 常量取自官方 OpenAPI 规范中各接口 ErrorResponseModel 的 code 枚举，值即
 // 官方原码；未收录的码同样会被解析出来，直接比较字符串即可，不必等 SDK 更新。
+//
+// 注意：规范里的枚举值并非全部与线上一致。账单域已确认有出入，相关常量下方
+// 标注了实测结论。交易域（ACQ.*）目前未发现不一致。做资金相关判断前，建议对
+// 着真实环境验证一次错误码，不要只依赖本文件。
 type Code string
 
 // 错误码常量，按官方原码字典序排列。
@@ -165,6 +181,11 @@ const (
 		}
 	}
 	for _, c := range codes {
+		if note, ok := knownMismatches[c]; ok {
+			fmt.Fprintf(&b, "\n\t// %s\n", note)
+			fmt.Fprintf(&b, "\t%s Code = %q\n\n", constName(c), c)
+			continue
+		}
 		fmt.Fprintf(&b, "\t%-*s Code = %q\n", width, constName(c), c)
 	}
 	b.WriteString(")\n")

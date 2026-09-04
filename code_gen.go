@@ -7,6 +7,10 @@ package alipay
 //
 // 常量取自官方 OpenAPI 规范中各接口 ErrorResponseModel 的 code 枚举，值即
 // 官方原码；未收录的码同样会被解析出来，直接比较字符串即可，不必等 SDK 更新。
+//
+// 注意：规范里的枚举值并非全部与线上一致。账单域已确认有出入，相关常量下方
+// 标注了实测结论。交易域（ACQ.*）目前未发现不一致。做资金相关判断前，建议对
+// 着真实环境验证一次错误码，不要只依赖本文件。
 type Code string
 
 // 错误码常量，按官方原码字典序排列。
@@ -78,12 +82,17 @@ const (
 	CodeACQTradeStatusError                      Code = "ACQ.TRADE_STATUS_ERROR"
 	CodeACQUserNotMatchErr                       Code = "ACQ.USER_NOT_MATCH_ERR"
 	CodeBillDateBeforeRegistration               Code = "BILL_DATE_BEFORE_REGISTRATION"
-	CodeBillNotExist                             Code = "BILL_NOT_EXIST"
-	CodeInvailidArguments                        Code = "INVAILID_ARGUMENTS"
-	CodeNoBillData                               Code = "NO_BILL_DATA"
-	CodeSystemRateLimit                          Code = "SYSTEM_RATE_LIMIT"
-	CodeTradeNotExist                            Code = "TRADE_NOT_EXIST"
-	CodeTypeNotSupported                         Code = "TYPE_NOT_SUPPORTED"
-	CodeUnknownError                             Code = "UNKNOWN_ERROR"
-	CodeUserRateLimit                            Code = "USER_RATE_LIMIT"
+
+	// 线上实际返回 "isp.bill_not_exist"，本常量匹配不到（2026-09-04 生产商户账号实测）
+	CodeBillNotExist Code = "BILL_NOT_EXIST"
+
+	// 线上实际返回 "invalid_arguments"，本常量匹配不到（2026-09-04 生产商户账号实测）
+	CodeInvailidArguments Code = "INVAILID_ARGUMENTS"
+
+	CodeNoBillData       Code = "NO_BILL_DATA"
+	CodeSystemRateLimit  Code = "SYSTEM_RATE_LIMIT"
+	CodeTradeNotExist    Code = "TRADE_NOT_EXIST"
+	CodeTypeNotSupported Code = "TYPE_NOT_SUPPORTED"
+	CodeUnknownError     Code = "UNKNOWN_ERROR"
+	CodeUserRateLimit    Code = "USER_RATE_LIMIT"
 )
