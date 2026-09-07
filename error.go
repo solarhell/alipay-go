@@ -75,6 +75,13 @@ var retryableCodes = map[Code]bool{
 // alipay.trade.fastpay.refund.query），根据查询结果决定后续，绝不能当作失败
 // 直接重发。对查询、账单下载这类只读接口，重试本身无害，可以忽略本方法。
 func (e *Error) Indeterminate() bool {
+	if retryableCodes[e.Code] {
+		// 码表明确说这是网关就地拒绝、没有副作用（限流），这比"5xx 即未知"的启发式
+		// 可信：限流码伴随的 HTTP 状态码没有线上样本，不能让一个未知的状态码把一个
+		// 已知的结论推翻成"结果未知"，那会让调用方对一次明明可以直接重试的限流去
+		// 白查一遍订单。
+		return false
+	}
 	return indeterminateCodes[e.Code] || e.StatusCode >= 500
 }
 

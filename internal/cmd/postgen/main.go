@@ -104,10 +104,38 @@ func extractCodes(f *ast.File) []string {
 
 	codes := make([]string, 0, len(seen))
 	for c := range seen {
-		codes = append(codes, c)
+		codes = append(codes, splitCompoundCode(c)...)
 	}
 	sort.Strings(codes)
-	return codes
+	return dedupe(codes)
+}
+
+// splitCompoundCode 把规范里被塞成一条的多个错误码拆开。
+//
+// CommonErrorType 里有一条枚举值是 "app-key-security-risk, app-cert-expired"——
+// 显然是两个码被逗号连在了一起写进了规范。原样生成出来的常量永远匹配不到真实
+// 报文（网关只会返回其中之一），拆成两个各自独立的码才有用。
+func splitCompoundCode(code string) []string {
+	if !strings.Contains(code, ",") {
+		return []string{code}
+	}
+	var out []string
+	for _, part := range strings.Split(code, ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
+}
+
+func dedupe(sorted []string) []string {
+	out := sorted[:0]
+	for i, c := range sorted {
+		if i == 0 || c != sorted[i-1] {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // knownMismatches 记录规范枚举值与线上实际返回不一致的错误码。
@@ -139,7 +167,7 @@ var initialisms = map[string]string{
 func constName(code string) string {
 	var b strings.Builder
 	b.WriteString("Code")
-	for _, word := range strings.FieldsFunc(code, func(r rune) bool { return r == '.' || r == '_' || r == '-' || r == ',' || r == ' ' }) {
+	for _, word := range strings.FieldsFunc(code, func(r rune) bool { return r == '.' || r == '_' || r == '-' }) {
 		if up, ok := initialisms[word]; ok {
 			b.WriteString(up)
 			continue

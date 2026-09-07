@@ -73,10 +73,10 @@ if alipay.IsCode(err, alipay.CodeACQTradeNotExist) {
 }
 ```
 
-168 个错误码常量由规范生成，与官方原码一一对应，分两类：
+169 个错误码常量由规范生成，与官方原码一一对应，分两类：
 
 - **业务码**（75 个，大写下划线，如 `ACQ.TRADE_NOT_EXIST`）：各接口自己的 `ErrorResponseModel`
-- **网关公共码**（93 个，小写连字符，如 `app-call-limited`、`missing-timestamp`）：每个接口的 default 响应都可能返回，覆盖限流、签名、鉴权、网关未知错误等
+- **网关公共码**（94 个，小写连字符，如 `app-call-limited`、`missing-timestamp`）：每个接口的 default 响应都可能返回，覆盖限流、签名、鉴权、网关未知错误等
 
 注意 `ACQ.TRADE_NOT_EXIST`（交易域）和 `TRADE_NOT_EXIST`（账单域）是两个不同的码，分别对应 `CodeACQTradeNotExist` 和 `CodeTradeNotExist`；公共码 `invalid-parameter` 与业务码 `ACQ.INVALID_PARAMETER` 同理。
 

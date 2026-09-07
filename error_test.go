@@ -165,3 +165,30 @@ func TestCommonCodesUseWireFormat(t *testing.T) {
 		t.Error("公共码 invalid-parameter 与业务码 ACQ.INVALID_PARAMETER 撞成同一个值")
 	}
 }
+
+// TestRateLimitCodeBeatsStatusHeuristic 限流码伴随 5xx 时，码表的明确知识压过"5xx 即未知"。
+//
+// 限流码伴随的 HTTP 状态码没有线上样本。若网关用 503 回 app-call-limited，此前的逻辑
+// 会把它判成结果未知、让调用方白查一遍订单——而限流是网关就地拒绝，根本没执行。
+func TestRateLimitCodeBeatsStatusHeuristic(t *testing.T) {
+	for _, st := range []int{400, 429, 500, 503} {
+		e := &Error{Code: CodeAppCallLimited, StatusCode: st}
+		if e.Indeterminate() {
+			t.Errorf("HTTP %d + app-call-limited 被判为结果未知", st)
+		}
+		if !e.Retryable() {
+			t.Errorf("HTTP %d + app-call-limited 被判为不可重试", st)
+		}
+	}
+	// 未知码 + 5xx 仍然是结果未知，启发式只让位给码表里明确的可重试码
+	if e := (&Error{Code: "some-new-code", StatusCode: 502}); !e.Indeterminate() || e.Retryable() {
+		t.Error("未知码 + 5xx 未按结果未知处理")
+	}
+}
+
+// TestCompoundSpecCodeIsSplit 规范里塞成一条的两个码必须被拆成两个常量。
+func TestCompoundSpecCodeIsSplit(t *testing.T) {
+	if CodeAppKeySecurityRisk != "app-key-security-risk" || CodeAppCertExpired != "app-cert-expired" {
+		t.Errorf("复合枚举未拆开: %q / %q", CodeAppKeySecurityRisk, CodeAppCertExpired)
+	}
+}
