@@ -48,6 +48,9 @@ func (e *Error) Error() string {
 // alipay.trade.query 确认订单状态，再决定下一步，而不是直接重试。
 var indeterminateCodes = map[Code]bool{
 	CodeACQSystemError: true,
+	// 网关公共码里的"服务暂不可用（业务系统不可用）"，即 v1 的 isp.unknow-error：
+	// 网关把请求转给了业务系统，业务系统没答上来。请求可能已经执行，写操作必须先查。
+	CodeUnknowError: true,
 }
 
 // retryableCodes 收录可以原样重试的错误码。
@@ -55,6 +58,12 @@ var indeterminateCodes = map[Code]bool{
 // 判据是"支付宝明确拒绝了这次请求、请求没有产生任何副作用"——限流就是典型：
 // 请求压根没被执行，退避之后重发是安全的。有副作用嫌疑的一律不放进来。
 var retryableCodes = map[Code]bool{
+	// 网关公共码：应用级 / 接口级调用次数或频率超限，请求在网关就被拒了，没有副作用。
+	// 这是 v3 真正的限流码（v1 写法 isv.app-call-limited / isv.method-call-limited）。
+	CodeAppCallLimited:    true,
+	CodeMethodCallLimited: true,
+	// 账单域业务码里的限流。规范这么写，但账单域的线上写法已证明与规范不一致，
+	// 这两个从未在实测中出现；留着不伤人，真正兜底的是上面两个公共码和 HTTP 429。
 	CodeSystemRateLimit: true,
 	CodeUserRateLimit:   true,
 }

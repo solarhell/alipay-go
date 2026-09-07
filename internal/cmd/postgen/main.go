@@ -81,7 +81,11 @@ func extractCodes(f *ast.File) []string {
 				continue
 			}
 			ident, ok := vs.Type.(*ast.Ident)
-			if !ok || !strings.HasSuffix(ident.Name, "ErrorResponseModelCode") {
+			// 两类枚举：各接口自己的 <Op>ErrorResponseModelCode（业务码），以及每个接口
+			// default 响应都引用的 CommonErrorTypeCode（网关公共码：限流、签名、鉴权、
+			// 网关未知错误……）。后者曾被漏掉——2026-09-07 才发现限流码 app-call-limited /
+			// method-call-limited 就在这张表里，而此前的实测与检索都没找到它。
+			if !ok || !(strings.HasSuffix(ident.Name, "ErrorResponseModelCode") || ident.Name == "CommonErrorTypeCode") {
 				continue
 			}
 			for _, v := range vs.Values {
@@ -128,13 +132,14 @@ var initialisms = map[string]string{
 //
 //	ACQ.TRADE_NOT_EXIST -> CodeACQTradeNotExist
 //	TRADE_NOT_EXIST     -> CodeTradeNotExist
+//	app-call-limited    -> CodeAppCallLimited   （公共码是小写连字符风格）
 //
 // 这两个码在 spec 里同时存在（后者来自账单下载接口），所以域前缀必须保留，
 // 否则会撞名——也正因如此，常量名一律与原码一一对应，不合并、不简写。
 func constName(code string) string {
 	var b strings.Builder
 	b.WriteString("Code")
-	for _, word := range strings.FieldsFunc(code, func(r rune) bool { return r == '.' || r == '_' }) {
+	for _, word := range strings.FieldsFunc(code, func(r rune) bool { return r == '.' || r == '_' || r == '-' || r == ',' || r == ' ' }) {
 		if up, ok := initialisms[word]; ok {
 			b.WriteString(up)
 			continue
@@ -160,11 +165,14 @@ package %s
 // 标注了实测结论。交易域（ACQ.*）目前未发现不一致。做资金相关判断前，建议对
 // 着真实环境验证一次错误码，不要只依赖本文件。
 //
-// 限流码（SYSTEM_RATE_LIMIT / USER_RATE_LIMIT）尚未实测：它们只出现在账单域，而
-// 账单域的枚举已证明与线上写法不同，线上限流码很可能同样不是这个写法，Retryable
-// 对它们的匹配可能落空，兜底靠 HTTP 429。2026-09-07 对生产网关做过有界压测
-// （账单接口，5→40 rps 阶梯，2 分钟 2209 次）全程未触发限流，实际码仍未观测到。
-// 线上真遇到限流时，从日志取实际码补进 code_observed.go 与分类表即可。
+// 常量分两类：各接口自己的业务码（如 ACQ.TRADE_NOT_EXIST，大写下划线），以及每个
+// 接口的 default 响应都会返回的网关公共码（如 app-call-limited，小写连字符）。
+// 公共码的写法已由线上验证：未签名请求返回的 missing-timestamp 就在这张表里。
+//
+// 限流是公共码 app-call-limited（应用调用次数/频率超限）与 method-call-limited
+// （单个接口调用次数/频率超限），不是账单域业务码 SYSTEM_RATE_LIMIT / USER_RATE_LIMIT
+// ——那两个的线上写法与规范不一致（见上文），且从未在实测中出现。2026-09-07 对生产
+// 网关压到 640 rps 也没触发限流，所以这两个公共码的取值只有规范背书，尚无线上样本。
 type Code string
 
 // 错误码常量，按官方原码字典序排列。

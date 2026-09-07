@@ -73,7 +73,14 @@ if alipay.IsCode(err, alipay.CodeACQTradeNotExist) {
 }
 ```
 
-75 个错误码常量由规范生成，与官方原码一一对应。注意 `ACQ.TRADE_NOT_EXIST`（交易域）和 `TRADE_NOT_EXIST`（账单域）是两个不同的码，分别对应 `CodeACQTradeNotExist` 和 `CodeTradeNotExist`。
+168 个错误码常量由规范生成，与官方原码一一对应，分两类：
+
+- **业务码**（75 个，大写下划线，如 `ACQ.TRADE_NOT_EXIST`）：各接口自己的 `ErrorResponseModel`
+- **网关公共码**（93 个，小写连字符，如 `app-call-limited`、`missing-timestamp`）：每个接口的 default 响应都可能返回，覆盖限流、签名、鉴权、网关未知错误等
+
+注意 `ACQ.TRADE_NOT_EXIST`（交易域）和 `TRADE_NOT_EXIST`（账单域）是两个不同的码，分别对应 `CodeACQTradeNotExist` 和 `CodeTradeNotExist`；公共码 `invalid-parameter` 与业务码 `ACQ.INVALID_PARAMETER` 同理。
+
+**限流是公共码** `app-call-limited`（应用级）/ `method-call-limited`（接口级），`Retryable()` 对它们为真；`unknow-error`（网关把请求转给了业务系统、业务系统没答上来）判为**结果未知**。
 
 ### ⚠️ 规范里的错误码枚举并非全部与线上一致
 
@@ -147,7 +154,7 @@ make generate   # 从官方规范重新生成（联网）
 
 ### 已知未实测项
 
-- **限流错误码。** 规范里限流码只出现在账单域（`SYSTEM_RATE_LIMIT` / `USER_RATE_LIMIT`），而账单域已实测证明规范枚举与线上返回不一致（见上文）。据此推断线上限流码很可能也不是规范里的写法，`Retryable()` 对它们的匹配可能落空；兜底是 HTTP 429，但支付宝限流时是否回 429 同样未验证。2026-09-07 用生产商户凭证对生产网关做过一次有界压测（账单下载地址查询，5→10→20→40 rps 阶梯各 30 秒，共 2209 次），**全程未触发限流**——账单接口至少能承受 40 rps 持续 30 秒，限流码因此仍未观测到。线上真遇到限流时，从日志取实际码补进 `code_observed.go` 与分类表即可。
+- **限流码尚无线上样本。** 限流是网关公共码 `app-call-limited` / `method-call-limited`（规范 `CommonErrorType`，v1 写法 `isv.app-call-limited` / `isv.method-call-limited`）。这张表的写法已由线上验证——未签名请求返回的 `missing-timestamp` 就在其中——但限流本身没触发过：2026-09-07 用生产商户凭证对账单下载地址查询压到 **640 rps、2 分钟 36000 次**，全程只返回 `isp.bill_not_exist`。因此这两个码的取值只有规范背书，伴随的 HTTP 状态码也未知；`Retryable()` 同时兜底 HTTP 429。
 - **证书模式**（`WithAppCertSN`）未经真实联调，本 SDK 的生产使用方走公钥模式。
 
 ## License

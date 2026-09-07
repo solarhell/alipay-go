@@ -117,3 +117,51 @@ func TestGeneratedCodesCoverKnownValues(t *testing.T) {
 		t.Error("ACQ.TRADE_NOT_EXIST 与 TRADE_NOT_EXIST 撞成了同一个值")
 	}
 }
+
+// TestCommonGatewayCodesClassification 钉住网关公共码的分类。
+//
+// 公共码此前被生成器整体漏掉（只认 *ErrorResponseModelCode 后缀），限流码因此从未
+// 进入分类表。这里把最关键的几条钉死：限流可原样重试、网关侧"业务系统不可用"
+// 结果未知、处罚不可重试。
+func TestCommonGatewayCodesClassification(t *testing.T) {
+	tests := []struct {
+		name          string
+		code          Code
+		indeterminate bool
+		retryable     bool
+	}{
+		{"应用级限流", CodeAppCallLimited, false, true},
+		{"接口级限流", CodeMethodCallLimited, false, true},
+		{"网关侧业务系统不可用", CodeUnknowError, true, false},
+		{"接口被处罚", CodeAppApiPunished, false, false},
+		{"签名错误", CodeInvalidSignature, false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := &Error{Code: tt.code, StatusCode: 400}
+			if got := e.Indeterminate(); got != tt.indeterminate {
+				t.Errorf("Indeterminate() = %v, 期望 %v", got, tt.indeterminate)
+			}
+			if got := e.Retryable(); got != tt.retryable {
+				t.Errorf("Retryable() = %v, 期望 %v", got, tt.retryable)
+			}
+		})
+	}
+}
+
+// TestCommonCodesUseWireFormat 钉住公共码的取值是线上写法（小写连字符）。
+//
+// missing-timestamp 是 2026-09-07 用未签名请求从生产网关实测拿到的，证明这张表
+// 就是线上真实写法；它与业务码的大写下划线风格并存，两者不能混用。
+func TestCommonCodesUseWireFormat(t *testing.T) {
+	if CodeMissingTimestamp != "missing-timestamp" {
+		t.Errorf("CodeMissingTimestamp = %q", CodeMissingTimestamp)
+	}
+	if CodeAppCallLimited != "app-call-limited" || CodeMethodCallLimited != "method-call-limited" {
+		t.Errorf("限流码取值 = %q / %q", CodeAppCallLimited, CodeMethodCallLimited)
+	}
+	// 公共码与业务码里都有"参数非法"，必须是两个不同的常量、两个不同的值
+	if CodeInvalidParameter == CodeACQInvalidParameter {
+		t.Error("公共码 invalid-parameter 与业务码 ACQ.INVALID_PARAMETER 撞成同一个值")
+	}
+}
