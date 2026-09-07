@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"net/url"
@@ -28,6 +29,14 @@ const (
 
 	defaultTimeout = 30 * time.Second
 
+	// defaultMaxRetries 是对"网关就地拒绝、没有副作用"的错误（限流）自动重试的默认次数。
+	// 限流退避一两次就过；再多只是拖长调用方的等待。
+	defaultMaxRetries = 2
+	// retryBaseDelay / retryMaxDelay 约束退避区间：基础 200ms 逐次翻倍、加抖动、封顶 2s。
+	// 调用方多半在等一个 HTTP 响应，总额外延迟控制在秒级。
+	retryBaseDelay = 200 * time.Millisecond
+	retryMaxDelay  = 2 * time.Second
+
 	// maxResponseBytes 限制读入内存的响应体大小。正常业务响应不到 10KB，
 	// 这个上限只为在网关异常时兜底，避免把内存读爆。
 	maxResponseBytes = 10 << 20
@@ -42,6 +51,9 @@ type Client struct {
 	baseURL      string
 	appAuthToken string
 	httpClient   *http.Client
+
+	maxRetries   int
+	retryBackoff func(attempt int) time.Duration // 测试注入零退避
 }
 
 // Option 定制 Client 的行为。
@@ -100,6 +112,15 @@ func defaultHTTPClient() *http.Client {
 	}
 }
 
+// WithMaxRetries 设置自动重试次数，0 关闭。默认 2。
+//
+// 只重试 Retryable() 为真的错误——网关就地拒绝、没有副作用的那一类（限流、429）。
+// 结果未知的错误（Indeterminate）和传输错误绝不会被重试：请求可能已经执行，
+// 重试就是重复下单或重复退款。
+func WithMaxRetries(n int) Option {
+	return func(c *Client) { c.maxRetries = max(n, 0) }
+}
+
 // WithAppCertSN 启用证书模式，传入应用公钥证书的 SN。
 //
 // 公钥模式（默认）不需要它。两种模式在开放平台上二选一，用错会让所有请求验签失败。
@@ -135,6 +156,8 @@ func New(appID, privateKey, alipayPublicKey string, opts ...Option) (*Client, er
 		alipayPubKey: pub,
 		baseURL:      ProductionURL,
 		httpClient:   defaultHTTPClient(),
+		maxRetries:   defaultMaxRetries,
+		retryBackoff: defaultRetryBackoff,
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -162,6 +185,25 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 		target += "?" + query.Encode()
 	}
 
+	// 重试环。每次尝试都重新签名——nonce 和 timestamp 是一次性的，复用 Authorization
+	// 头等于重放，网关可能直接拒绝。只对 Retryable() 为真的错误重试；退避期间
+	// 尊重 ctx，调用方的超时或取消立刻生效。
+	for attempt := 0; ; attempt++ {
+		err := c.attempt(ctx, method, path, target, body, out)
+		if err == nil {
+			return nil
+		}
+		if attempt >= c.maxRetries || !Retryable(err) {
+			return err
+		}
+		if err := sleepCtx(ctx, c.retryBackoff(attempt)); err != nil {
+			return fmt.Errorf("alipay: %s: 重试等待被取消: %w", path, err)
+		}
+	}
+}
+
+// attempt 发一次已签名的请求并解析响应。
+func (c *Client) attempt(ctx context.Context, method, path, target string, body []byte, out any) error {
 	auth, err := c.signer.authorization(method, target, body, c.appAuthToken)
 	if err != nil {
 		return err
@@ -197,6 +239,32 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 	}
 
 	return c.handleResponse(path, resp, respBody, out)
+}
+
+// defaultRetryBackoff 是第 attempt 次重试前的等待：200ms × 2^attempt，加最多 50% 的
+// 随机抖动，封顶 2s。抖动是为了让一批同时被限流的调用方错开再来，而不是同一毫秒
+// 再撞一次。
+func defaultRetryBackoff(attempt int) time.Duration {
+	d := retryBaseDelay << attempt
+	if d > retryMaxDelay {
+		d = retryMaxDelay
+	}
+	return d + time.Duration(rand.Int64N(int64(d)/2+1))
+}
+
+// sleepCtx 等待 d，ctx 先结束则立刻返回其错误。
+func sleepCtx(ctx context.Context, d time.Duration) error {
+	if d <= 0 {
+		return ctx.Err()
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
 }
 
 func (c *Client) handleResponse(path string, resp *http.Response, body []byte, out any) error {
