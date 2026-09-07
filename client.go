@@ -245,7 +245,9 @@ func (c *Client) attempt(ctx context.Context, method, path, target string, body 
 // 随机抖动，封顶 2s。抖动是为了让一批同时被限流的调用方错开再来，而不是同一毫秒
 // 再撞一次。
 func defaultRetryBackoff(attempt int) time.Duration {
-	d := retryBaseDelay << attempt
+	// 200ms << 4 已经超过封顶值，指数到此为止：再往上移位会溢出成负数，
+	// rand.Int64N 收到负数直接 panic。WithMaxRetries 传个大数就能踩到。
+	d := retryBaseDelay << min(max(attempt, 0), 4)
 	if d > retryMaxDelay {
 		d = retryMaxDelay
 	}

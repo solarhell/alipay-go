@@ -153,9 +153,10 @@ func TestWithMaxRetriesZeroDisables(t *testing.T) {
 	}
 }
 
-// TestDefaultRetryBackoffBounds 退避在 [200ms, 3s] 内且封顶。
+// TestDefaultRetryBackoffBounds 退避在 [200ms, 3s] 内且封顶，且任意大的 attempt
+// 都不会溢出——移位溢出成负数会让 rand.Int64N panic，WithMaxRetries 传个大数就能踩到。
 func TestDefaultRetryBackoffBounds(t *testing.T) {
-	for attempt := 0; attempt < 10; attempt++ {
+	for _, attempt := range []int{0, 1, 2, 5, 10, 31, 40, 63, 100, -1} {
 		d := defaultRetryBackoff(attempt)
 		if d < retryBaseDelay || d > retryMaxDelay+retryMaxDelay/2 {
 			t.Errorf("attempt %d 退避 %v 越界", attempt, d)
