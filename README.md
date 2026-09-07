@@ -84,7 +84,7 @@ if alipay.IsCode(err, alipay.CodeACQTradeNotExist) {
 
 ### 自动重试
 
-`Retryable()` 为真的错误（限流、HTTP 429）SDK 会自动重试，默认 2 次，退避 200ms 起逐次翻倍、加抖动、封顶 2s，每次重新签名（nonce 一次性，复用等于重放），退避期间尊重 `ctx`。结果未知的错误和传输错误**绝不重试**——请求可能已经执行，重试就是重复下单或重复退款。`WithMaxRetries(0)` 关闭。与 stripe-go 的 `MaxNetworkRetries` 同一取舍：隐式重试会让延迟不可见，用严格边界、小默认值和可关闭来对冲。
+`Retryable()` 为真的错误（限流、HTTP 429）SDK 会自动重试，默认 2 次，退避 200ms 起逐次翻倍、加抖动、封顶 2s，每次重新签名（nonce 一次性，复用等于重放），退避期间尊重 `ctx`。结果未知的错误和传输错误**绝不重试**——请求可能已经执行，重试就是重复下单或重复退款。`WithMaxRetries(0)` 关闭，上限 10。与 stripe-go 的 `MaxNetworkRetries` 同一取舍：隐式重试会让延迟不可见，用严格边界、小默认值和可关闭来对冲。
 
 ### ⚠️ 规范里的错误码枚举并非全部与线上一致
 

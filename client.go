@@ -32,6 +32,9 @@ const (
 	// defaultMaxRetries 是对"网关就地拒绝、没有副作用"的错误（限流）自动重试的默认次数。
 	// 限流退避一两次就过；再多只是拖长调用方的等待。
 	defaultMaxRetries = 2
+	// maxRetriesCap 是 WithMaxRetries 能设到的上限。限流退避封顶 2s，10 次已合计约 20s
+	// 的额外等待——再多不是"更健壮"，是把一次明确的拒绝硬拖成一分钟的挂起。
+	maxRetriesCap = 10
 	// retryBaseDelay / retryMaxDelay 约束退避区间：基础 200ms 逐次翻倍、加抖动、封顶 2s。
 	// 调用方多半在等一个 HTTP 响应，总额外延迟控制在秒级。
 	retryBaseDelay = 200 * time.Millisecond
@@ -112,13 +115,13 @@ func defaultHTTPClient() *http.Client {
 	}
 }
 
-// WithMaxRetries 设置自动重试次数，0 关闭。默认 2。
+// WithMaxRetries 设置自动重试次数，0 关闭。默认 2，上限 10（超过按 10 计）。
 //
 // 只重试 Retryable() 为真的错误——网关就地拒绝、没有副作用的那一类（限流、429）。
 // 结果未知的错误（Indeterminate）和传输错误绝不会被重试：请求可能已经执行，
 // 重试就是重复下单或重复退款。
 func WithMaxRetries(n int) Option {
-	return func(c *Client) { c.maxRetries = max(n, 0) }
+	return func(c *Client) { c.maxRetries = min(max(n, 0), maxRetriesCap) }
 }
 
 // WithAppCertSN 启用证书模式，传入应用公钥证书的 SN。

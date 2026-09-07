@@ -163,3 +163,21 @@ func TestDefaultRetryBackoffBounds(t *testing.T) {
 		}
 	}
 }
+
+// TestWithMaxRetriesClamped 重试次数有上限：传 100 按 10 计，传负数按 0。
+//
+// 没人会故意配几十次重试，正因如此 SDK 不该允许——限流下每次退避封顶 2s，
+// 几十次就是把一次明确的拒绝硬拖成一分钟的挂起。
+func TestWithMaxRetriesClamped(t *testing.T) {
+	c, err := New("2021000000000000", privPEM(t, key(t)), pubPEM(t, &alipayKey(t).PublicKey), WithMaxRetries(100))
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if c.maxRetries != maxRetriesCap {
+		t.Errorf("WithMaxRetries(100) → %d，期望钳位到 %d", c.maxRetries, maxRetriesCap)
+	}
+	c2, _ := New("2021000000000000", privPEM(t, key(t)), pubPEM(t, &alipayKey(t).PublicKey), WithMaxRetries(-5))
+	if c2.maxRetries != 0 {
+		t.Errorf("WithMaxRetries(-5) → %d，期望 0", c2.maxRetries)
+	}
+}
