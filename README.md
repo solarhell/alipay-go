@@ -158,7 +158,8 @@ make generate   # 从官方规范重新生成（联网）
 
 ### 已知未实测项
 
-- **限流码尚无线上样本。** 限流是网关公共码 `app-call-limited` / `method-call-limited`（规范 `CommonErrorType`，v1 写法 `isv.app-call-limited` / `isv.method-call-limited`）。这张表的写法已由线上验证——未签名请求返回的 `missing-timestamp` 就在其中——但限流本身没触发过：2026-09-07 用生产商户凭证对账单下载地址查询压到 **640 rps、2 分钟 36000 次**，全程只返回 `isp.bill_not_exist`。因此这两个码的取值只有规范背书，伴随的 HTTP 状态码也未知；`Retryable()` 同时兜底 HTTP 429。
+- **限流码尚无线上样本。** 限流是网关公共码 `app-call-limited` / `method-call-limited`（规范 `CommonErrorType`，v1 写法 `isv.app-call-limited` / `isv.method-call-limited`）。这张表的写法已由线上验证——未签名请求返回的 `missing-timestamp` 就在其中——但限流本身没触发过：2026-09-07 用生产商户凭证对账单下载地址查询压到 **640 rps、2 分钟 36000 次**，全程只返回 `isp.bill_not_exist`；沙箱则在 20 rps 就先过载（见下）。因此这两个码的取值只有规范背书，伴随的 HTTP 状态码也未知；`Retryable()` 同时兜底 HTTP 429。
+- **`unknow-error` 有线上样本：HTTP 500、message「系统繁忙」。** 2026-09-07 沙箱在 20～80 rps 下即返回，占比 14～19%。这是网关过载时的呈现，不是限流码。SDK 判为**结果未知**（不自动重试）：网关说「繁忙」时业务系统可能已经收到请求，写操作必须先查证；只读接口由调用方按自己的节奏重试即可。
 - **证书模式**（`WithAppCertSN`）未经真实联调，本 SDK 的生产使用方走公钥模式。
 
 ## License
