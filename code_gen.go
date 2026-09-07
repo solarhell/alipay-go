@@ -16,13 +16,13 @@ package alipay
 // 接口的 default 响应都会返回的网关公共码（如 app-call-limited，小写连字符）。
 // 公共码的写法已由线上验证：未签名请求返回的 missing-timestamp 就在这张表里。
 //
-// 限流是公共码 app-call-limited（应用调用次数/频率超限）与 method-call-limited
-// （单个接口调用次数/频率超限），不是账单域业务码 SYSTEM_RATE_LIMIT / USER_RATE_LIMIT
-// ——那两个的线上写法与规范不一致（见上文），且从未在实测中出现。2026-09-07 对生产
-// 网关压到 640 rps 也没触发限流，所以这两个公共码的取值只有规范背书，尚无线上样本。
+// 限流码有两层。业务码 SYSTEM_RATE_LIMIT 有线上样本：2026-09-07 对生产网关的账单
+// 下载地址查询压到约 2000 rps 时返回 HTTP 400、message「系统流量超限」，规范原样
+// ——系统级流控。公共码 app-call-limited / method-call-limited（应用级 / 接口级配额）
+// 尚无线上样本；交易查询压到 800 rps 也未触发。两层都在 Retryable 的表里。
 //
-// unknow-error 有线上样本：HTTP 500、message「系统繁忙」（2026-09-07 沙箱过载时观测），
-// 这是网关过载的呈现而非限流码，判为结果未知。
+// unknow-error 有样本：HTTP 500、message「系统繁忙」（2026-09-07 沙箱过载时观测，
+// 生产网关未见），这是网关过载的呈现而非限流码，判为结果未知。
 type Code string
 
 // 错误码常量，按官方原码字典序排列。

@@ -80,7 +80,7 @@ if alipay.IsCode(err, alipay.CodeACQTradeNotExist) {
 
 注意 `ACQ.TRADE_NOT_EXIST`（交易域）和 `TRADE_NOT_EXIST`（账单域）是两个不同的码，分别对应 `CodeACQTradeNotExist` 和 `CodeTradeNotExist`；公共码 `invalid-parameter` 与业务码 `ACQ.INVALID_PARAMETER` 同理。
 
-**限流是公共码** `app-call-limited`（应用级）/ `method-call-limited`（接口级），`Retryable()` 对它们为真；`unknow-error`（网关把请求转给了业务系统、业务系统没答上来）判为**结果未知**。
+**限流有两层**，都在 `Retryable()` 的表里：业务码 `SYSTEM_RATE_LIMIT`（系统级流控，已有线上样本：HTTP 400「系统流量超限」）；公共码 `app-call-limited` / `method-call-limited`（应用级 / 接口级配额，尚无样本）。`unknow-error`（网关把请求转给了业务系统、业务系统没答上来）判为**结果未知**。
 
 ### 自动重试
 
@@ -158,8 +158,8 @@ make generate   # 从官方规范重新生成（联网）
 
 ### 已知未实测项
 
-- **限流码尚无线上样本。** 限流是网关公共码 `app-call-limited` / `method-call-limited`（规范 `CommonErrorType`，v1 写法 `isv.app-call-limited` / `isv.method-call-limited`）。这张表的写法已由线上验证——未签名请求返回的 `missing-timestamp` 就在其中——但限流本身没触发过：2026-09-07 用生产商户凭证对账单下载地址查询压到 **640 rps、2 分钟 36000 次**，全程只返回 `isp.bill_not_exist`；沙箱则在 20 rps 就先过载（见下）。因此这两个码的取值只有规范背书，伴随的 HTTP 状态码也未知；`Retryable()` 同时兜底 HTTP 429。
-- **`unknow-error` 有线上样本：HTTP 500、message「系统繁忙」。** 2026-09-07 沙箱在 20～80 rps 下即返回，占比 14～19%。这是网关过载时的呈现，不是限流码。SDK 判为**结果未知**（不自动重试）：网关说「繁忙」时业务系统可能已经收到请求，写操作必须先查证；只读接口由调用方按自己的节奏重试即可。
+- **限流：业务码有样本，公共码没有。** 2026-09-07 用生产商户凭证对账单下载地址查询阶梯压测，**约 2000 rps 时**（62080 次中 1 次）返回 `HTTP 400 code="SYSTEM_RATE_LIMIT" message="系统流量超限"`——规范原样，系统级流控，`Retryable()` 当场判为可重试。此前推断「账单域枚举都与线上不符、所以限流一定是公共码」是**错的**，这个码是准的。公共码 `app-call-limited` / `method-call-limited`（应用级 / 接口级配额，v1 写法 `isv.*`）仍无样本：交易查询压到 **800 rps × 42000 次**也未触发。`Retryable()` 同时兜底 HTTP 429。
+- **`unknow-error` 有沙箱样本：HTTP 500、message「系统繁忙」。** 2026-09-07 沙箱在 20～80 rps 下即返回，占比 14～19%；生产网关压到 2000 rps 未见。沙箱行为不代表生产，仅作码/格式参考。这是网关过载时的呈现，不是限流码。SDK 判为**结果未知**（不自动重试）：网关说「繁忙」时业务系统可能已经收到请求，写操作必须先查证；只读接口由调用方按自己的节奏重试即可。
 - **证书模式**（`WithAppCertSN`）未经真实联调，本 SDK 的生产使用方走公钥模式。
 
 ## License

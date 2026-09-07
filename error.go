@@ -58,12 +58,13 @@ var indeterminateCodes = map[Code]bool{
 // 判据是"支付宝明确拒绝了这次请求、请求没有产生任何副作用"——限流就是典型：
 // 请求压根没被执行，退避之后重发是安全的。有副作用嫌疑的一律不放进来。
 var retryableCodes = map[Code]bool{
-	// 网关公共码：应用级 / 接口级调用次数或频率超限，请求在网关就被拒了，没有副作用。
-	// 这是 v3 真正的限流码（v1 写法 isv.app-call-limited / isv.method-call-limited）。
+	// 网关公共码：应用级 / 接口级调用次数或频率超限，请求在网关就被拒了，没有副作用
+	// （v1 写法 isv.app-call-limited / isv.method-call-limited）。尚无线上样本。
 	CodeAppCallLimited:    true,
 	CodeMethodCallLimited: true,
-	// 账单域业务码里的限流。规范这么写，但账单域的线上写法已证明与规范不一致，
-	// 这两个从未在实测中出现；留着不伤人，真正兜底的是上面两个公共码和 HTTP 429。
+	// 账单域业务码里的限流。SYSTEM_RATE_LIMIT 有线上样本：2026-09-07 对生产网关的
+	// 账单下载地址查询压到约 2000 rps 时返回 HTTP 400、message「系统流量超限」——
+	// 规范原样。这是系统级流控，不是按应用计的配额。USER_RATE_LIMIT 尚未观测到。
 	CodeSystemRateLimit: true,
 	CodeUserRateLimit:   true,
 }
