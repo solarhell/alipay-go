@@ -23,7 +23,7 @@ Go 1.27 或更高。用到了 `new(表达式)`（Go 1.26）和 `encoding/json/v2
 go get github.com/solarhell/alipay-go
 ```
 
-本仓库**不打 tag**：`go get` 会解析到 `main` 最新提交的伪版本（`v0.0.0-<时间>-<提交>`），
+本仓库**不打 tag**：`go get` 会解析到 `master` 最新提交的伪版本（`v0.0.0-<时间>-<提交>`），
 需要钉住某个提交时用 `go get github.com/solarhell/alipay-go@<commit>`。生成产物随代码
 一起提交，规范版本由 `OPENAPI_VERSION` 钉住，升级规范是一次显式提交，不需要发布号。
 
