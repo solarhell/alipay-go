@@ -20,12 +20,14 @@ Go 1.27 或更高。用到了 `new(表达式)`（Go 1.26）和 `encoding/json/v2
 ## 安装
 
 ```bash
-go get github.com/solarhell/alipay-go
+go get github.com/solarhell/alipay-go@v0.1.1
 ```
 
-本仓库**不打 tag**：`go get` 会解析到 `master` 最新提交的伪版本（`v0.0.0-<时间>-<提交>`），
-需要钉住某个提交时用 `go get github.com/solarhell/alipay-go@<commit>`。生成产物随代码
-一起提交，规范版本由 `OPENAPI_VERSION` 钉住，升级规范是一次显式提交，不需要发布号。
+从 `v0.1.1` 起恢复使用语义版本 tag 发布，常规升级使用
+`go get github.com/solarhell/alipay-go@latest`。需要试用尚未发布的提交时，使用
+`go get github.com/solarhell/alipay-go@<commit>`，并将解析后的伪版本提交到 `go.mod`。
+
+生成产物随代码一起提交，规范版本由 `OPENAPI_VERSION` 钉住；升级规范仍需显式提交并发布新版本。
 
 ## 快速开始
 

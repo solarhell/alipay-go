@@ -120,7 +120,7 @@ func splitCompoundCode(code string) []string {
 		return []string{code}
 	}
 	var out []string
-	for _, part := range strings.Split(code, ",") {
+	for part := range strings.SplitSeq(code, ",") {
 		if part = strings.TrimSpace(part); part != "" {
 			out = append(out, part)
 		}
