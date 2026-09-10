@@ -250,10 +250,7 @@ func (c *Client) attempt(ctx context.Context, method, path, target string, body 
 func defaultRetryBackoff(attempt int) time.Duration {
 	// 200ms << 4 已经超过封顶值，指数到此为止：再往上移位会溢出成负数，
 	// rand.Int64N 收到负数直接 panic。WithMaxRetries 传个大数就能踩到。
-	d := retryBaseDelay << min(max(attempt, 0), 4)
-	if d > retryMaxDelay {
-		d = retryMaxDelay
-	}
+	d := min(retryBaseDelay<<min(max(attempt, 0), 4), retryMaxDelay)
 	return d + time.Duration(rand.Int64N(int64(d)/2+1))
 }
 

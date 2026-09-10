@@ -110,8 +110,7 @@ func TestNoRetryOnTransportError(t *testing.T) {
 	c.baseURL = "http://127.0.0.1:1"
 
 	err := c.do(context.Background(), http.MethodPost, "/v3/alipay/trade/precreate", nil, nil, nil)
-	var te *TransportError
-	if !errors.As(err, &te) {
+	if _, ok := errors.AsType[*TransportError](err); !ok {
 		t.Fatalf("期望 TransportError，得到 %T", err)
 	}
 	if got := rs.count(); got != 0 {
