@@ -27,10 +27,6 @@ go get github.com/solarhell/alipay-go@v0.1.1
 `go get github.com/solarhell/alipay-go@latest`。需要试用尚未发布的提交时，使用
 `go get github.com/solarhell/alipay-go@<commit>`，并将解析后的伪版本提交到 `go.mod`。
 
-`v0.1.0` 已撤回：它不包含后续的网关错误码修正、限流重试和退避溢出修复。
-删除 Git tag 不会移除 Go Proxy 中已缓存的版本，因此通过 `go.mod` 的 `retract`
-声明避免常规升级再次选中该版本。
-
 生成产物随代码一起提交，规范版本由 `OPENAPI_VERSION` 钉住；升级规范仍需显式提交并发布新版本。
 
 ## 快速开始
